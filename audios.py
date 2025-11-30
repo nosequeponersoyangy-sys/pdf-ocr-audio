@@ -14,16 +14,15 @@ if os.name == 'nt':
     possible_path = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     if os.path.exists(possible_path):
         pytesseract.pytesseract.tesseract_cmd = possible_path
-    else:
-        pass 
-else:
-    pass
 
 st.set_page_config(page_title="PDF a Audio con IA", page_icon="🎙️")
 
 async def generar_audio(texto, archivo_salida, voz):
-    comunicador = edge_tts.Communicate(texto, voz)
-    await comunicador.save(archivo_salida)
+    try:
+        comunicador = edge_tts.Communicate(texto, voz)
+        await comunicador.save(archivo_salida)
+    except Exception as e:
+        raise Exception(f"Error al generar audio: {str(e)}")
 
 def ocr_imagen(imagen):
     try:
@@ -42,6 +41,14 @@ def corregir_orientacion(img):
     except Exception:
         pass
     return img, False
+
+def limpiar_texto(texto):
+    """Limpia el texto para que sea compatible con TTS"""
+    texto_limpio = re.sub(r'(?<!\.)[\n\r]+', ' ', texto)
+    texto_limpio = re.sub(r'\.[\n\r]+', '. ', texto_limpio)
+    texto_limpio = re.sub(r'\s+', ' ', texto_limpio).strip()
+    texto_limpio = re.sub(r'[^\w\s.,;:¿?¡!áéíóúÁÉÍÓÚñÑüÜ()-]', '', texto_limpio)
+    return texto_limpio
 
 def procesar_pdf(archivo_pdf, es_doble_pagina, auto_rotar):
     doc = fitz.open(stream=archivo_pdf.read(), filetype="pdf")
@@ -89,7 +96,9 @@ with st.sidebar:
             ('es-AR-TomasNeural', '🇦🇷 Tomás (Hombre)'),
             ('es-AR-ElenaNeural', '🇦🇷 Elena (Mujer)'),
             ('es-ES-AlvaroNeural', '🇪🇸 Álvaro (España)'),
-            ('es-MX-DaliaNeural', '🇲🇽 Dalia (México)')
+            ('es-ES-ElviraNeural', '🇪🇸 Elvira (España)'),
+            ('es-MX-DaliaNeural', '🇲🇽 Dalia (México)'),
+            ('es-MX-JorgeNeural', '🇲🇽 Jorge (México)')
         ],
         format_func=lambda x: x[1]
     )
@@ -120,35 +129,48 @@ if archivo_subido is not None:
             try:
                 texto_extraido_crudo = procesar_pdf(archivo_subido, es_libro, activar_rotacion)
                 
-                texto_limpio = re.sub(r'(?<!\.)[\n\r]+', ' ', texto_extraido_crudo)
-                texto_limpio = re.sub(r'\.[\n\r]+', '. ', texto_limpio)
-                texto_final = re.sub(r'\s+', ' ', texto_limpio).strip()
+                texto_final = limpiar_texto(texto_extraido_crudo)
                 
-                if len(texto_final.strip()) < 50:
-                    st.error("⚠️ Error: Se leyó muy poco texto. Puede que el PDF esté en blanco o la calidad sea muy baja.")
+                if len(texto_final.strip()) < 10:
+                    st.error("⚠️ Error: El texto extraído está vacío o es muy corto.")
+                    st.info("Intenta con otro PDF o desactiva las opciones de escaneo.")
                 else:
-                    st.info(f"📄 Se extrajeron {len(texto_final)} caracteres. Generando audio...")
+                    st.info(f"📄 Se extrajeron {len(texto_final)} caracteres.")
+                    
+                    with st.expander("Ver texto extraído (primeros 500 caracteres)"):
+                        st.text(texto_final[:500])
+                    
+                    st.info("Generando audio...")
                     
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
                         ruta_temporal = tmp_file.name
                     
                     asyncio.run(generar_audio(texto_final, ruta_temporal, voz_seleccionada[0]))
                     
-                    st.balloons()
-                    st.success("¡Audio listo para escuchar!")
-                    
-                    st.audio(ruta_temporal, format="audio/mp3")
-                    
-                    with open(ruta_temporal, "rb") as file:
-                        st.download_button(
-                            label="⬇️ Descargar MP3",
-                            data=file,
-                            file_name="audiolibro_ia.mp3",
-                            mime="audio/mp3",
-                            use_container_width=True
-                        )
+                    if os.path.exists(ruta_temporal) and os.path.getsize(ruta_temporal) > 0:
+                        st.balloons()
+                        st.success("¡Audio listo para escuchar!")
+                        
+                        st.audio(ruta_temporal, format="audio/mp3")
+                        
+                        with open(ruta_temporal, "rb") as file:
+                            st.download_button(
+                                label="⬇️ Descargar MP3",
+                                data=file,
+                                file_name="audiolibro_ia.mp3",
+                                mime="audio/mp3",
+                                use_container_width=True
+                            )
+                    else:
+                        st.error("El archivo de audio no se generó correctamente.")
                         
             except Exception as e:
-                st.error(f"❌ Ocurrió un error inesperado: {e}")
-                if "tesseract" in str(e).lower():
-                    st.warning("Consejo: Verifica la instalación de Tesseract OCR y que la ruta en el código sea correcta.")
+                st.error(f"❌ Ocurrió un error: {str(e)}")
+                
+                if "no audio" in str(e).lower():
+                    st.warning("💡 Posibles soluciones:")
+                    st.write("1. Verifica tu conexión a internet")
+                    st.write("2. El texto puede contener caracteres no soportados")
+                    st.write("3. Intenta con otra voz")
+                elif "tesseract" in str(e).lower():
+                    st.warning("Consejo: Verifica la instalación de Tesseract OCR.")
