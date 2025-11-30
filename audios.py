@@ -151,4 +151,5 @@ if archivo_subido is not None:
             except Exception as e:
                 st.error(f"❌ Ocurrió un error inesperado: {e}")
                 if "tesseract" in str(e).lower():
+
                     st.warning("Consejo: Verifica la instalación de Tesseract OCR y que la ruta en el código sea correcta.")
