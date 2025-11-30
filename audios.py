@@ -187,30 +187,26 @@ with st.sidebar:
         help="Activa esto si el PDF está escaneado como imagen."
     )
     
-    if forzar_ocr:
-        activar_rotacion = st.checkbox(
-            "🔄 Enderezar automáticamente", 
-            value=True,
-            help="Detecta si la hoja está de costado y la endereza."
-        )
-        es_libro = st.checkbox(
-            "📖 Separar doble página", 
-            value=True,
-            help="Para PDFs con dos páginas del libro en una sola hoja."
-        )
-        usar_paralelo = st.checkbox(
-            "⚡ Procesamiento paralelo", 
-            value=True,
-            help="Procesa múltiples páginas simultáneamente."
-        )
-    else:
-        activar_rotacion = False
-        es_libro = False
-        usar_paralelo = True
-        st.info("💡 Detección automática activada")
+    activar_rotacion = st.checkbox(
+        "🔄 Enderezar automáticamente", 
+        value=True,
+        help="Detecta si la hoja está horizontal y la gira verticalmente antes de leer."
+    )
+
+    es_libro = st.checkbox(
+        "📖 Separar doble página", 
+        value=True,
+        help="Si el PDF tiene dos páginas del libro en una sola hoja, las cortará y leerá por separado (primero izquierda, luego derecha)."
+    )
+    
+    usar_paralelo = st.checkbox(
+        "⚡ Procesamiento paralelo", 
+        value=True,
+        help="Procesa múltiples páginas al mismo tiempo (más rápido para PDFs grandes)."
+    )
     
     st.divider()
-    st.caption("📊 Límite: 200MB")
+    st.caption("📊 Límite: 200MB | 🚀 Auto-optimizado")
 
 archivo_subido = st.file_uploader("Arrastra tu PDF aquí", type="pdf")
 
@@ -291,4 +287,4 @@ if archivo_subido is not None:
         with st.expander("🔍 Preview (primeros 500 caracteres)"):
             preview = st.session_state.texto_extraido[:500]
             st.text(preview)
-            st.caption("✅ Palabras cortadas unificadas automáticamente")
+            st.caption("✅ Palabras cortadas con guión unificadas automáticamente")
